@@ -3,6 +3,10 @@
 /Packages
 xcuserdata/
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.swiftpm
 .netrc
+/Package.resolved
+/AGENTS.md
+/CLAUDE.md
+/.claude
+/.swiftpm
