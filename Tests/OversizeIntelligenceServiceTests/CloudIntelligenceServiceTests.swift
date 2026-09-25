@@ -91,6 +91,29 @@ import Testing
         return Data("data: \(json)\n\ndata: [DONE]\n\n".utf8)
     }
 
+    private func streamBodyWithUsage(content: String) -> Data {
+        let contentChunk: [String: Any] = [
+            "id": "chatcmpl-1",
+            "model": "gpt-test",
+            "choices": [["index": 0, "delta": ["role": "assistant", "content": content]]],
+        ]
+        let usageChunk: [String: Any] = [
+            "id": "chatcmpl-1",
+            "model": "gpt-test",
+            "choices": [],
+            "usage": [
+                "prompt_tokens": 1200,
+                "completion_tokens": 300,
+                "prompt_tokens_details": ["cached_tokens": 1024],
+                "completion_tokens_details": ["reasoning_tokens": 120],
+            ],
+        ]
+        let lines = [contentChunk, usageChunk].map { chunk in
+            "data: " + String(data: try! JSONSerialization.data(withJSONObject: chunk), encoding: .utf8)! + "\n\n"
+        }
+        return Data((lines.joined() + "data: [DONE]\n\n").utf8)
+    }
+
     @available(iOS 27.0, macOS 27.0, visionOS 27.0, *)
     private func makeService() -> IntelligenceService {
         IntelligenceService(provider: .openAI(model: "gpt-test")) {
@@ -175,6 +198,43 @@ import Testing
             let suggestion = try #require((item["properties"] as? [String: Any])?["suggestion"] as? [String: Any])
             let variants = try #require(suggestion["anyOf"] as? [[String: Any]])
             #expect(variants.contains { $0["type"] as? String == "null" })
+        }
+
+        @Test
+        func structuredRequestSendsReasoningEffortAndCacheKeyAndReturnsUsage() async throws {
+            guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else { return }
+            let payload = #"{"items":[{"keyword":"scanner","intent":"feature","relevance":0.9,"suggestion":null}]}"#
+            StubURLProtocol.install(.init(status: 200, headers: ["Content-Type": "text/event-stream"], body: streamBodyWithUsage(content: payload)))
+
+            let schema = try IntelligenceJSONSchema(name: "aso_keyword_intent", schema: intentSchema)
+            let response = try await makeService().respondStructured(
+                to: "Classify",
+                instructions: "Return JSON.",
+                schema: schema,
+                options: IntelligenceRequestOptions(reasoningEffort: .low, promptCacheKey: "intent-app")
+            )
+
+            let body = try #require(StubURLProtocol.requests.first?.httpBody)
+            let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            #expect(object["reasoning_effort"] as? String == "low")
+            #expect(object["prompt_cache_key"] as? String == "intent-app")
+            #expect(object["temperature"] == nil)
+            #expect(response.usage == IntelligenceUsage(inputTokens: 1200, cachedInputTokens: 1024, outputTokens: 300, reasoningTokens: 120))
+        }
+
+        @Test
+        func requestWithoutEffortOmitsReasoningFields() async throws {
+            guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else { return }
+            let payload = #"{"items":[]}"#
+            StubURLProtocol.install(.init(status: 200, headers: ["Content-Type": "text/event-stream"], body: streamBody(content: payload)))
+
+            let schema = try IntelligenceJSONSchema(name: "aso_keyword_intent", schema: intentSchema)
+            _ = try await makeService().respondStructured(to: "Classify", instructions: nil, schema: schema, options: .init())
+
+            let body = try #require(StubURLProtocol.requests.first?.httpBody)
+            let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            #expect(object["reasoning_effort"] == nil)
+            #expect(object["prompt_cache_key"] == nil)
         }
 
         @Test

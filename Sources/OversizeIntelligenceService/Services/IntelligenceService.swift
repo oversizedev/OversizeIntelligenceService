@@ -34,16 +34,27 @@ public protocol IntelligenceServiceProtocol: Sendable {
         options: IntelligenceRequestOptions
     ) async throws -> String
 
+    /// Returns the model's answer as JSON text that conforms to `schema`, with the token usage
+    /// the provider reported for it.
+    func respondStructured(
+        to prompt: String,
+        instructions: String?,
+        schema: IntelligenceJSONSchema,
+        options: IntelligenceRequestOptions
+    ) async throws -> IntelligenceStructuredResponse
+}
+
+public extension IntelligenceServiceProtocol {
     /// Returns the model's answer as JSON text that conforms to `schema`.
     func respond(
         to prompt: String,
         instructions: String?,
         schema: IntelligenceJSONSchema,
         options: IntelligenceRequestOptions
-    ) async throws -> String
-}
+    ) async throws -> String {
+        try await respondStructured(to: prompt, instructions: instructions, schema: schema, options: options).text
+    }
 
-public extension IntelligenceServiceProtocol {
     func respond(to prompt: String) async throws -> String {
         try await respond(to: prompt, instructions: nil, options: IntelligenceRequestOptions())
     }
@@ -129,12 +140,12 @@ public final class IntelligenceService: IntelligenceServiceProtocol {
         }
     }
 
-    public func respond(
+    public func respondStructured(
         to prompt: String,
         instructions: String?,
         schema: IntelligenceJSONSchema,
         options: IntelligenceRequestOptions
-    ) async throws -> String {
+    ) async throws -> IntelligenceStructuredResponse {
         let generationSchema: GenerationSchema
         do {
             generationSchema = try schema.generationSchema()
@@ -148,7 +159,7 @@ public final class IntelligenceService: IntelligenceServiceProtocol {
                 schema: generationSchema,
                 options: options.generationOptions
             )
-            return response.content.jsonString
+            return IntelligenceStructuredResponse(text: response.content.jsonString, usage: Self.usage(of: response))
         } catch {
             throw Self.mapped(error)
         }
@@ -180,6 +191,8 @@ public final class IntelligenceService: IntelligenceServiceProtocol {
                     name: options.model ?? defaultModel,
                     url: baseURL,
                     additionalHeaders: ["Authorization": "Bearer \(apiKey)"],
+                    reasoningEffort: options.reasoningEffort?.rawValue,
+                    promptCacheKey: options.promptCacheKey,
                     urlSessionConfiguration: configuration
                 )
                 return LanguageModelSession(model: model, instructions: instructions ?? "")
@@ -187,6 +200,24 @@ public final class IntelligenceService: IntelligenceServiceProtocol {
                 throw IntelligenceError.unsupportedPlatform
             #endif
         }
+    }
+
+    // MARK: - Usage
+
+    private static func usage(of response: LanguageModelSession.Response<GeneratedContent>) -> IntelligenceUsage? {
+        #if canImport(FoundationModels, _version: 2)
+            if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
+                let usage = response.usage
+                guard usage.input.totalTokenCount > 0 || usage.output.totalTokenCount > 0 else { return nil }
+                return IntelligenceUsage(
+                    inputTokens: usage.input.totalTokenCount,
+                    cachedInputTokens: usage.input.cachedTokenCount,
+                    outputTokens: usage.output.totalTokenCount,
+                    reasoningTokens: usage.output.reasoningTokenCount
+                )
+            }
+        #endif
+        return nil
     }
 
     // MARK: - Errors

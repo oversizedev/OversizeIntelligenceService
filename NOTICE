@@ -18,3 +18,5 @@ Local modifications:
   `Retry-After` and `x-ratelimit-reset-*`.
 - The structured-output schema is sent without the framework's `x-order` extension key, and
   optional properties are sent as required and nullable, as strict structured outputs demand.
+- `ChatCompletionsLanguageModel` takes optional `reasoningEffort` and `promptCacheKey`, sent as
+  `reasoning_effort` and `prompt_cache_key` when set.

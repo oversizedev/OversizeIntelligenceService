@@ -27,5 +27,5 @@ import Foundation
 #endif
 
 public enum IntelligenceModelDefaults {
-    public static let openAIModel = "gpt-5.6"
+    public static let openAIModel = "gpt-6-luna"
 }

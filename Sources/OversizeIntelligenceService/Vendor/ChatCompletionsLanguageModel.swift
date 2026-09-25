@@ -61,6 +61,12 @@ public struct ChatCompletionsLanguageModel: Sendable, LanguageModel {
 
   public var supportsGuidedGeneration: Bool
 
+  /// Sent as `reasoning_effort` when set; reasoning models otherwise use their own default.
+  public var reasoningEffort: String?
+
+  /// Sent as `prompt_cache_key` when set, so requests sharing a prefix land on the same cache.
+  public var promptCacheKey: String?
+
   // Overridden in tests to inject a URLSession with mock protocol handlers.
   var urlSession: URLSession?
 
@@ -83,12 +89,16 @@ public struct ChatCompletionsLanguageModel: Sendable, LanguageModel {
     url: URL,
     additionalHeaders: [String: String] = [:],
     supportsGuidedGeneration: Bool = true,
+    reasoningEffort: String? = nil,
+    promptCacheKey: String? = nil,
     urlSessionConfiguration: URLSessionConfiguration? = nil
   ) {
     self.name = name
     self.url = url
     self.additionalHeaders = additionalHeaders
     self.supportsGuidedGeneration = supportsGuidedGeneration
+    self.reasoningEffort = reasoningEffort
+    self.promptCacheKey = promptCacheKey
     self.urlSession = urlSessionConfiguration.map { URLSession(configuration: $0) }
   }
 
@@ -106,6 +116,8 @@ public struct ChatCompletionsLanguageModel: Sendable, LanguageModel {
       modelName: name,
       url: url,
       additionalHeaders: additionalHeaders,
+      reasoningEffort: reasoningEffort,
+      promptCacheKey: promptCacheKey,
       urlSession: urlSession
     )
   }
@@ -205,18 +217,24 @@ public struct ChatCompletionsLanguageModel: Sendable, LanguageModel {
       fileprivate let modelName: String
       fileprivate let url: URL
       fileprivate let additionalHeaders: [String: String]
+      fileprivate let reasoningEffort: String?
+      fileprivate let promptCacheKey: String?
       fileprivate let urlSession: URLSession?
 
       public static func == (lhs: Configuration, rhs: Configuration) -> Bool {
         lhs.modelName == rhs.modelName
           && lhs.url == rhs.url
           && lhs.additionalHeaders == rhs.additionalHeaders
+          && lhs.reasoningEffort == rhs.reasoningEffort
+          && lhs.promptCacheKey == rhs.promptCacheKey
       }
 
       public func hash(into hasher: inout Hasher) {
         hasher.combine(modelName)
         hasher.combine(url)
         hasher.combine(additionalHeaders)
+        hasher.combine(reasoningEffort)
+        hasher.combine(promptCacheKey)
       }
     }
 
@@ -276,7 +294,9 @@ public struct ChatCompletionsLanguageModel: Sendable, LanguageModel {
               schema: schema
             )
           )
-        }
+        },
+        reasoningEffort: configuration.reasoningEffort,
+        promptCacheKey: configuration.promptCacheKey
       )
 
       // Stream the response back into the framework via `channel`.
@@ -728,6 +748,8 @@ private struct ChatCompletionsClient {
     var tools: [Tool]?
     var toolChoice: ChatCompletionRequest.ToolChoice?
     var responseFormat: ResponseFormat?
+    var reasoningEffort: String?
+    var promptCacheKey: String?
     var stream = true
     var streamOptions = StreamOptions(includeUsage: true)
 
@@ -747,6 +769,8 @@ private struct ChatCompletionsClient {
       case maxCompletionTokens = "max_completion_tokens"
       case tools
       case responseFormat = "response_format"
+      case reasoningEffort = "reasoning_effort"
+      case promptCacheKey = "prompt_cache_key"
       case stream
       case streamOptions = "stream_options"
       case toolChoice = "tool_choice"
