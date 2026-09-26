@@ -22,3 +22,4 @@ Local modifications:
   `reasoning_effort` and `prompt_cache_key` when set.
 - A stream chunk that decodes neither as a chunk nor as an API error throws
   `RequestError.invalidStreamData` instead of the raw `DecodingError`.
+- Instructions without content are not sent as an empty system message.
