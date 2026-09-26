@@ -249,6 +249,12 @@ import Testing
         }
 
         @Test
+        func streamedRateLimitIsARateLimit() {
+            #expect(IntelligenceRequestError.from(code: "rate_limit_exceeded", message: "Slow down") == .rateLimited(headers: [:]))
+            #expect(IntelligenceRequestError.from(code: "insufficient_quota", message: "Quota") == .quotaExhausted(code: "insufficient_quota"))
+        }
+
+        @Test
         func rateLimitCarriesHeaders() async throws {
             guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else { return }
             let body = Data(#"{"error":{"code":"rate_limit_exceeded","message":"Slow down"}}"#.utf8)

@@ -53,12 +53,19 @@ public enum IntelligenceRequestError: Error, Sendable, Equatable {
         }
     }
 
+    /// An error delivered inside a stream rather than as an HTTP status. A rate limit reported this
+    /// way is still a rate limit, so callers retry it as they would a 429.
     static func from(code: String?, message: String) -> IntelligenceRequestError {
         if let code, permanentBillingCodes.contains(code) {
             return .quotaExhausted(code: code)
         }
+        if code == rateLimitCode {
+            return .rateLimited(headers: [:])
+        }
         return .api(code: code, message: message)
     }
+
+    static let rateLimitCode = "rate_limit_exceeded"
 }
 
 private struct ErrorEnvelope: Decodable {
