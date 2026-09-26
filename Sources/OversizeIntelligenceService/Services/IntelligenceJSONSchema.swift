@@ -76,7 +76,9 @@ public struct IntelligenceJSONSchema: Sendable, Equatable {
                 dictionary["x-order"] = required + remaining
             }
             if dictionary["title"] == nil {
-                dictionary["title"] = path.map(Self.capitalized).joined()
+                // Titles become `$defs` keys, so path components keep a boundary: `userProfile` and
+                // `user.profile` would otherwise both be `RootUserProfile`.
+                dictionary["title"] = path.map(Self.capitalized).joined(separator: "_")
             }
             return dictionary
         }

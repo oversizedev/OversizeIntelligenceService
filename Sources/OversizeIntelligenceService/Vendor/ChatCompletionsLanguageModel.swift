@@ -717,7 +717,7 @@ private struct ChatCompletionsClient {
             code: response.error.code
           )
         }
-        throw error
+        throw ChatCompletionsLanguageModel.RequestError.invalidStreamData
       }
     }
 

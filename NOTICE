@@ -20,3 +20,5 @@ Local modifications:
   optional properties are sent as required and nullable, as strict structured outputs demand.
 - `ChatCompletionsLanguageModel` takes optional `reasoningEffort` and `promptCacheKey`, sent as
   `reasoning_effort` and `prompt_cache_key` when set.
+- A stream chunk that decodes neither as a chunk nor as an API error throws
+  `RequestError.invalidStreamData` instead of the raw `DecodingError`.
