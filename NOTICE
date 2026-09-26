@@ -1,0 +1,25 @@
+OversizeIntelligenceService
+Copyright © 2025-2026 Alexander Romanov
+
+This package includes code from Foundation Models Utilities
+(https://github.com/apple/foundation-models-utilities),
+Copyright © 2024-2027 Apple Inc. and the Foundation Models project authors,
+licensed under the Apache License, Version 2.0 (see LICENSE-APACHE.txt).
+
+Vendored file: Sources/OversizeIntelligenceService/Vendor/ChatCompletionsLanguageModel.swift
+Upstream revision: cc3820def1fe016bc6cd49d958cd2f2a29be76a8
+
+Local modifications:
+- Types are annotated with @available(iOS 27, macOS 27, visionOS 27, watchOS 27) instead of
+  raising the package's minimum platform versions, and the file is wrapped in
+  `#if canImport(FoundationModels, _version: 2)`.
+- Imports are plain `import` statements (the package does not enable InternalImportsByDefault).
+- `RequestError.httpError` also carries the response headers, so callers can honour
+  `Retry-After` and `x-ratelimit-reset-*`.
+- The structured-output schema is sent without the framework's `x-order` extension key, and
+  optional properties are sent as required and nullable, as strict structured outputs demand.
+- `ChatCompletionsLanguageModel` takes optional `reasoningEffort` and `promptCacheKey`, sent as
+  `reasoning_effort` and `prompt_cache_key` when set.
+- A stream chunk that decodes neither as a chunk nor as an API error throws
+  `RequestError.invalidStreamData` instead of the raw `DecodingError`.
+- Instructions without content are not sent as an empty system message.
