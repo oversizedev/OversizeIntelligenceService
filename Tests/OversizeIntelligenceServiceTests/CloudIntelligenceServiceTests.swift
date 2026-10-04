@@ -21,8 +21,8 @@ import Testing
         }
 
         private static let lock = NSLock()
-        nonisolated(unsafe) private static var reply = Reply(status: 200, headers: [:], body: Data())
-        nonisolated(unsafe) private static var capturedRequests: [URLRequest] = []
+        private nonisolated(unsafe) static var reply = Reply(status: 200, headers: [:], body: Data())
+        private nonisolated(unsafe) static var capturedRequests: [URLRequest] = []
 
         static func install(_ newReply: Reply) {
             lock.withLock {
@@ -123,28 +123,30 @@ import Testing
         }
     }
 
-    private var intentSchema: [String: Any] { [
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["items"],
-        "properties": [
-            "items": [
-                "type": "array",
-                "maxItems": 3,
+    private var intentSchema: [String: Any] {
+        [
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["items"],
+            "properties": [
                 "items": [
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["keyword", "intent", "relevance", "suggestion"],
-                    "properties": [
-                        "keyword": ["type": "string", "description": "The keyword."],
-                        "intent": ["type": "string", "enum": ["feature", "brand"]],
-                        "relevance": ["type": "number"],
-                        "suggestion": ["type": ["string", "null"]],
+                    "type": "array",
+                    "maxItems": 3,
+                    "items": [
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["keyword", "intent", "relevance", "suggestion"],
+                        "properties": [
+                            "keyword": ["type": "string", "description": "The keyword."],
+                            "intent": ["type": "string", "enum": ["feature", "brand"]],
+                            "relevance": ["type": "number"],
+                            "suggestion": ["type": ["string", "null"]],
+                        ],
                     ],
                 ],
             ],
-        ],
-    ] }
+        ]
+    }
 
     // MARK: - Tests
 

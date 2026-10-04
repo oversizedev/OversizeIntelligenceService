@@ -10,13 +10,18 @@ let commonDependencies: [PackageDescription.Package.Dependency] = [
 
 let remoteDependencies: [PackageDescription.Package.Dependency] = commonDependencies + [
     .package(url: "https://github.com/oversizedev/OversizeCore.git", .upToNextMajor(from: "1.18.0")),
+    .package(url: "https://github.com/oversizedev/OversizeServices.git", .upToNextMajor(from: "1.27.0")),
 ]
 
 let localDependencies: [PackageDescription.Package.Dependency] = commonDependencies + [
     .package(name: "OversizeCore", path: "../OversizeCore"),
+    .package(name: "OversizeServices", path: "../OversizeServices"),
 ]
 
-let isLocalDev = FileManager.default.fileExists(atPath: "\(NSHomeDirectory())/Developer/Packages/OversizeCore")
+let isLocalDev = ["OversizeCore", "OversizeServices"].allSatisfy {
+    FileManager.default.fileExists(atPath: "\(NSHomeDirectory())/Developer/Packages/\($0)")
+}
+
 let dependencies: [PackageDescription.Package.Dependency] = isLocalDev ? localDependencies : remoteDependencies
 
 let package = Package(
@@ -38,6 +43,7 @@ let package = Package(
             dependencies: [
                 .product(name: "FactoryKit", package: "Factory"),
                 .product(name: "OversizeCore", package: "OversizeCore"),
+                .product(name: "OversizeServices", package: "OversizeServices"),
             ]
         ),
         .testTarget(
