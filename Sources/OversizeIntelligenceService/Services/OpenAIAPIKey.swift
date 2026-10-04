@@ -4,8 +4,17 @@
 //
 
 import Foundation
+import OversizeServices
 
 public enum OpenAIAPIKey {
     public static let keychainService = "AppConnector.OpenAI"
     public static let keychainKey = "apiKey"
+}
+
+public extension Keychain {
+    static let openAIAPIKey = Keychain(
+        service: OpenAIAPIKey.keychainService,
+        synchronizable: true,
+        useDataProtectionKeychain: true,
+    )
 }

@@ -23,7 +23,8 @@ public extension Container {
     var intelligenceServiceKeyProvider: Factory<IntelligenceServiceKeyProvider> {
         self {
             {
-                (try? Keychain(service: OpenAIAPIKey.keychainService).string(forKey: OpenAIAPIKey.keychainKey)) ?? environmentKey("OPENAI_API_KEY")
+                (try? Keychain.openAIAPIKey.string(forKey: OpenAIAPIKey.keychainKey))
+                    ?? environmentKey("OPENAI_API_KEY")
             }
         }
     }
