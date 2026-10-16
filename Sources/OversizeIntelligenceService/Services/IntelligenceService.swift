@@ -54,9 +54,30 @@ public protocol IntelligenceServiceProtocol: Sendable {
         schema: IntelligenceJSONSchema,
         options: IntelligenceRequestOptions
     ) async throws -> IntelligenceStructuredResponse
+
+    func respondStructured(
+        to prompt: String,
+        images: [IntelligenceImage],
+        instructions: String?,
+        schema: IntelligenceJSONSchema,
+        options: IntelligenceRequestOptions
+    ) async throws -> IntelligenceStructuredResponse
 }
 
 public extension IntelligenceServiceProtocol {
+    func respondStructured(
+        to prompt: String,
+        images: [IntelligenceImage],
+        instructions: String?,
+        schema: IntelligenceJSONSchema,
+        options: IntelligenceRequestOptions
+    ) async throws -> IntelligenceStructuredResponse {
+        guard images.isEmpty else {
+            throw IntelligenceError.unsupportedPlatform
+        }
+        return try await respondStructured(to: prompt, instructions: instructions, schema: schema, options: options)
+    }
+
     /// Returns the model's answer as JSON text that conforms to `schema`.
     func respond(
         to prompt: String,
@@ -158,6 +179,36 @@ public enum IntelligenceAvailability {
             schema: IntelligenceJSONSchema,
             options: IntelligenceRequestOptions
         ) async throws -> IntelligenceStructuredResponse {
+            try await structuredResponse(to: Prompt(prompt), instructions: instructions, schema: schema, options: options)
+        }
+
+        public func respondStructured(
+            to prompt: String,
+            images: [IntelligenceImage],
+            instructions: String?,
+            schema: IntelligenceJSONSchema,
+            options: IntelligenceRequestOptions
+        ) async throws -> IntelligenceStructuredResponse {
+            guard !images.isEmpty else {
+                return try await respondStructured(to: prompt, instructions: instructions, schema: schema, options: options)
+            }
+            #if canImport(FoundationModels, _version: 2)
+                guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else {
+                    throw IntelligenceError.unsupportedPlatform
+                }
+                let fullPrompt = try Self.prompt(prompt, images: images)
+                return try await structuredResponse(to: fullPrompt, instructions: instructions, schema: schema, options: options)
+            #else
+                throw IntelligenceError.unsupportedPlatform
+            #endif
+        }
+
+        private func structuredResponse(
+            to prompt: Prompt,
+            instructions: String?,
+            schema: IntelligenceJSONSchema,
+            options: IntelligenceRequestOptions
+        ) async throws -> IntelligenceStructuredResponse {
             let generationSchema: GenerationSchema
             do {
                 generationSchema = try schema.generationSchema()
@@ -176,6 +227,22 @@ public enum IntelligenceAvailability {
                 throw Self.mapped(error)
             }
         }
+
+        #if canImport(FoundationModels, _version: 2)
+            @available(iOS 27.0, macOS 27.0, visionOS 27.0, *)
+            static func prompt(_ text: String, images: [IntelligenceImage]) throws -> Prompt {
+                let thumbnails = try images.map { image in
+                    try (header: image.promptHeader, thumbnail: image.thumbnail())
+                }
+                return Prompt {
+                    text
+                    for item in thumbnails {
+                        item.header
+                        Attachment(item.thumbnail)
+                    }
+                }
+            }
+        #endif
 
         // MARK: - Session
 
