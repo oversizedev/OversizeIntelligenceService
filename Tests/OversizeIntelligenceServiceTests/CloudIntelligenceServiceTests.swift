@@ -3,9 +3,11 @@
 // CloudIntelligenceServiceTests.swift, created on 25.09.2026
 //
 
+import CoreGraphics
 import FactoryKit
 import FactoryTesting
 import Foundation
+import ImageIO
 @testable import OversizeIntelligenceService
 import Testing
 
@@ -112,6 +114,26 @@ import Testing
             "data: " + String(data: try! JSONSerialization.data(withJSONObject: chunk), encoding: .utf8)! + "\n\n"
         }
         return Data((lines.joined() + "data: [DONE]\n\n").utf8)
+    }
+
+    private func writeTestImage(width: Int, height: Int) throws -> URL {
+        let context = try #require(CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(CGColor(red: 0, green: 0.4, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let image = try #require(context.makeImage())
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).png")
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        #expect(CGImageDestinationFinalize(destination))
+        return url
     }
 
     @available(iOS 27.0, macOS 27.0, visionOS 27.0, *)
@@ -278,6 +300,65 @@ import Testing
             await #expect(throws: IntelligenceRequestError.unauthorized(status: 401)) {
                 try await makeService().respond(to: "Hi", instructions: nil, options: .init())
             }
+        }
+
+        @Test
+        func imagesFollowTheirLabelsInTheUserMessage() async throws {
+            guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else { return }
+            StubURLProtocol.install(.init(status: 200, headers: ["Content-Type": "text/event-stream"], body: streamBody(content: #"{"items":[]}"#)))
+            let imageURL = try writeTestImage(width: 1290, height: 2796)
+            defer { try? FileManager.default.removeItem(at: imageURL) }
+
+            let schema = try IntelligenceJSONSchema(name: "aso_keyword_intent", schema: intentSchema)
+            _ = try await makeService().respondStructured(
+                to: "Describe",
+                images: [IntelligenceImage(label: "1", url: imageURL)],
+                instructions: nil,
+                schema: schema,
+                options: .init()
+            )
+
+            let body = try #require(StubURLProtocol.requests.first?.httpBody)
+            let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let messages = try #require(object["messages"] as? [[String: Any]])
+            let userContent = try #require(messages.last { $0["role"] as? String == "user" }?["content"] as? [[String: Any]])
+            let texts = userContent.compactMap { $0["text"] as? String }
+            #expect(texts.contains { $0.contains("Describe") })
+            let headerIndex = try #require(userContent.firstIndex { ($0["text"] as? String)?.contains("Image 1:") == true })
+            let imageIndex = try #require(userContent.firstIndex { $0["image_url"] != nil })
+            #expect(headerIndex < imageIndex)
+            let imagePart = try #require(userContent[imageIndex]["image_url"] as? [String: Any])
+            #expect((imagePart["url"] as? String)?.hasPrefix("data:image/jpeg;base64,") == true)
+        }
+
+        @Test
+        func unreadableImageFailsBeforeAnyRequest() async throws {
+            guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else { return }
+            StubURLProtocol.install(.init(status: 200, headers: [:], body: Data()))
+            let missingURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).png")
+
+            let schema = try IntelligenceJSONSchema(name: "aso_keyword_intent", schema: intentSchema)
+            await #expect(throws: IntelligenceImageError.unreadable(label: "2")) {
+                try await makeService().respondStructured(
+                    to: "Describe",
+                    images: [IntelligenceImage(label: "2", url: missingURL)],
+                    instructions: nil,
+                    schema: schema,
+                    options: .init()
+                )
+            }
+            #expect(StubURLProtocol.requests.isEmpty)
+        }
+
+        @Test
+        func thumbnailFitsTheMaximumSide() throws {
+            let imageURL = try writeTestImage(width: 1290, height: 2796)
+            defer { try? FileManager.default.removeItem(at: imageURL) }
+
+            let thumbnail = try IntelligenceImage(label: "1", url: imageURL, maxPixelSize: 512).thumbnail()
+
+            #expect(max(thumbnail.width, thumbnail.height) == 512)
+            #expect(thumbnail.width < thumbnail.height)
         }
 
         @Test
