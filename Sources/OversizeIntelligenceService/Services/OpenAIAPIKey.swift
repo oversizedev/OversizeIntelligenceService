@@ -4,17 +4,12 @@
 //
 
 import Foundation
-import OversizeServices
 
 public enum OpenAIAPIKey {
-    public static let keychainService = "AppConnector.OpenAI"
-    public static let keychainKey = "apiKey"
-}
+    public static let environmentVariable = "OPENAI_API_KEY"
 
-public extension Keychain {
-    static let openAIAPIKey = Keychain(
-        service: OpenAIAPIKey.keychainService,
-        synchronizable: true,
-        useDataProtectionKeychain: true,
-    )
+    public static var environmentValue: String? {
+        guard let value = ProcessInfo.processInfo.environment[environmentVariable], !value.isEmpty else { return nil }
+        return value
+    }
 }
