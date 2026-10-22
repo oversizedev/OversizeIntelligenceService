@@ -6,7 +6,6 @@
 import FactoryKit
 import Foundation
 import OversizeCore
-import OversizeServices
 
 #if canImport(FoundationModels)
     import FoundationModels
@@ -14,25 +13,15 @@ import OversizeServices
 
 // MARK: - IntelligenceServiceKeyProvider
 
-/// How the OpenAI token reaches a request. By default it is read from the Keychain on every call,
-/// so a key saved mid-session is picked up, then from `OPENAI_API_KEY`, which only the Dev scheme
-/// and command-line consumers set; tests register their own provider.
+/// How the OpenAI token reaches a request. By default it comes from `OPENAI_API_KEY`, which only
+/// the Dev scheme and command-line consumers set; where the key is stored is the app's decision, so
+/// the app registers its own provider, and tests register theirs.
 public typealias IntelligenceServiceKeyProvider = @Sendable () -> String?
 
 public extension Container {
     var intelligenceServiceKeyProvider: Factory<IntelligenceServiceKeyProvider> {
-        self {
-            {
-                (try? Keychain.openAIAPIKey.string(forKey: OpenAIAPIKey.keychainKey))
-                    ?? environmentKey("OPENAI_API_KEY")
-            }
-        }
+        self { { OpenAIAPIKey.environmentValue } }
     }
-}
-
-private func environmentKey(_ name: String) -> String? {
-    guard let value = ProcessInfo.processInfo.environment[name], !value.isEmpty else { return nil }
-    return value
 }
 
 // MARK: - IntelligenceServiceProtocol
